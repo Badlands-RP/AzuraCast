@@ -1,8 +1,8 @@
-name: Build Badlands AzuraCast
+name: Build Badlands AzuraCast (stable)
 
 on:
   push:
-    branches: [feature/delegated-user-management]
+    branches: [badlands/stable-delegated]
   workflow_dispatch:
 
 permissions:
@@ -65,7 +65,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/badlands-rp/azuracast:delegated
+            ghcr.io/badlands-rp/azuracast:stable-delegated
             ghcr.io/badlands-rp/azuracast:${{ github.sha }}
           build-args: |
             FORK_REVISION=${{ github.sha }}

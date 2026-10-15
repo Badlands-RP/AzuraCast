@@ -26,8 +26,8 @@ AzuraCast is built and maintained by passionate human beings, and 100% of our co
 
 ## Badlands fork deployment
 
-The `feature/delegated-user-management` branch builds `ghcr.io/badlands-rp/azuracast:delegated`
-through the **Build Badlands AzuraCast** GitHub Actions workflow. The first published package must be public
+The `badlands/stable-delegated` branch builds `ghcr.io/badlands-rp/azuracast:stable-delegated`
+through the **Build Badlands AzuraCast (stable)** GitHub Actions workflow. The first published package must be public
 in GitHub Packages for your server and web updater to pull it without registry credentials.
 
 Before switching an existing installation, download a full backup from AzuraCast. In Termius, open the server
@@ -37,7 +37,7 @@ and change to its AzuraCast installation directory (normally `/var/azuracast`). 
 ```yaml
 services:
   web:
-    image: ghcr.io/badlands-rp/azuracast:delegated
+    image: ghcr.io/badlands-rp/azuracast:stable-delegated
 ```
 
 Preserve any existing overrides. Then run `docker compose pull web` followed by `docker compose up -d web`.
