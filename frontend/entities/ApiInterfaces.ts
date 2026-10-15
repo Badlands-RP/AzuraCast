@@ -153,6 +153,10 @@ export enum GlobalPermissions {
     CustomFields = "administer custom fields",
     Backups = "administer backups",
     StorageLocations = "administer storage locations",
+    CreateUsers = "create users",
+    ManageUsers = "manage users",
+    AssignRoles = "assign roles",
+    ManageRoles = "manage roles",
 }
 
 export enum FlashLevels {
@@ -429,6 +433,8 @@ export type ApiAdminRole = HasLinks & {
     permissions?: ApiAdminRolePermissions;
     /** Whether this role is the protected "Super Administrator" role. */
     readonly is_super_admin?: boolean;
+    assignable_roles?: number[];
+    is_protected?: boolean;
 };
 
 export interface ApiAdminRolePermissions {
@@ -602,6 +608,8 @@ export interface ApiAdminVuePermissionsProps {
     stations: Record<string, string>;
     globalPermissions: Record<string, string>;
     stationPermissions: Record<string, string>;
+    assignableRoles: Record<string, string>;
+    stationPermissionsByStation: Record<string, Record<string, string>>;
 }
 
 export interface ApiAdminVueSettingsProps {
@@ -2931,6 +2939,8 @@ export type User = HasAutoIncrementId & {
     auth_password?: string;
     /** @example "Demo Account" */
     name?: string | null;
+    /** Only super administrators can change protection from delegated administration. */
+    is_protected?: boolean;
     /** @example "en_US" */
     locale?: string | null;
     /** @example true */

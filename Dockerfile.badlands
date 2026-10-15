@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
+COPY frontend ./frontend
+COPY translations ./translations
+COPY vite.config.js tsconfig.json biome.json ./
+RUN npm run tsc -- --noEmit && npm run build
+
+# This runtime was built from ebf75a267fd2113c1c1b881c04a58babdf4356d3, the fork's base commit.
+# Sync the fork and update this digest together when upgrading the upstream runtime.
+FROM ghcr.io/azuracast/azuracast@sha256:32a866405aec62d682a2d93efb3a82568d852fda73a5011b46759b572367fdf0
+WORKDIR /var/azuracast/www
+USER azuracast
+COPY --chown=azuracast:azuracast backend ./backend
+COPY --chown=azuracast:azuracast frontend ./frontend
+COPY --chown=azuracast:azuracast web/static/openapi.yml ./web/static/openapi.yml
+COPY --chown=azuracast:azuracast --from=frontend /build/web/static/vite_dist ./web/static/vite_dist
+ARG FORK_REVISION=unknown
+ARG FORK_COMMIT_DATE=1970-01-01T00:00:00Z
+ARG FORK_BRANCH=feature/delegated-user-management
+RUN chmod +x backend/bin/* \
+    && composer dump-autoload --no-dev --optimize --classmap-authoritative \
+    && printf 'COMMIT_LONG="%s"\nCOMMIT_DATE="%s"\nBRANCH="%s"\n' \
+        "$FORK_REVISION" "$FORK_COMMIT_DATE" "$FORK_BRANCH" > .gitinfo
+USER root

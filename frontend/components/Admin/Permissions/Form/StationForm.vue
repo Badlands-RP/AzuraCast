@@ -5,7 +5,7 @@
             :key="index"
             v-model:row="form.permissions.station[index]"
             :stations="stations"
-            :station-permissions="stationPermissions"
+            :station-permissions="stationPermissionsByStation[form.permissions.station[index].id] ?? stationPermissions"
             @remove="remove(index)"
         />
 
@@ -52,6 +52,7 @@ import Tab from "~/components/Common/Tab.vue";
 const props = defineProps<{
     stations: Record<string, string>;
     stationPermissions: Record<string, string>;
+    stationPermissionsByStation: Record<number, Record<string, string>>;
 }>();
 
 const form = defineModel<PermissionsRecord>("form", { required: true });

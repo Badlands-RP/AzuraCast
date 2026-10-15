@@ -63,7 +63,7 @@
                 <li v-if="showAdmin">
                     <router-link
                         class="dropdown-item"
-                        :to="{ name: 'admin:index'}"
+                        :to="{ name: adminRoute }"
                     >
                         <icon-ic-settings/>
 
@@ -163,7 +163,20 @@ const { instanceName, logoutUrl } = useAzuraCastDashboardGlobals();
 const { displayName } = useAzuraCastUser();
 
 const { userAllowed } = useUserAllowed();
-const showAdmin = userAllowed(GlobalPermissions.View);
+const canAdministerUsers = [
+    GlobalPermissions.CreateUsers,
+    GlobalPermissions.ManageUsers,
+    GlobalPermissions.AssignRoles,
+].some(userAllowed);
+const showAdmin =
+    userAllowed(GlobalPermissions.View) ||
+    canAdministerUsers ||
+    userAllowed(GlobalPermissions.ManageRoles);
+const adminRoute = userAllowed(GlobalPermissions.View)
+    ? "admin:index"
+    : canAdministerUsers
+      ? "admin:users:index"
+      : "admin:permissions:index";
 
 const { toggleTheme } = useTheme();
 

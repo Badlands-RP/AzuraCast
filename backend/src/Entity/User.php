@@ -105,6 +105,13 @@ class User implements Stringable, IdentifiableEntityInterface
     }
 
     #[
+        OA\Property(description: 'Only super administrators can change protection from delegated administration.'),
+        ORM\Column(options: ['default' => false]),
+        Serializer\Groups([EntityGroupsInterface::GROUP_ADMIN, EntityGroupsInterface::GROUP_ALL])
+    ]
+    public bool $is_protected = false;
+
+    #[
         OA\Property(example: "en_US"),
         ORM\Column(length: 25, nullable: true),
         Serializer\Groups([EntityGroupsInterface::GROUP_GENERAL, EntityGroupsInterface::GROUP_ALL])

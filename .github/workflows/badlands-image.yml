@@ -1,0 +1,78 @@
+name: Build Badlands AzuraCast
+
+on:
+  push:
+    branches: [feature/delegated-user-management]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: badlands-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:lts
+        env:
+          MARIADB_ROOT_PASSWORD: permissions-test-only
+          MARIADB_DATABASE: delegation_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: intl, pdo_sqlite, pdo_mysql
+          tools: composer:v2
+      - run: composer install --no-interaction --no-progress --ignore-platform-req=ext-*
+      - run: >-
+          vendor/bin/phpunit --bootstrap tests/_bootstrap.php
+          tests/Unit/DelegatedUserAdministrationTest.php tests/Unit/DelegatedUserAdministrationMigrationTest.php
+        env:
+          DELEGATION_TEST_MYSQL_HOST: 127.0.0.1
+          DELEGATION_TEST_MYSQL_PASSWORD: permissions-test-only
+
+  image:
+    needs: security-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record commit date
+        id: commit
+        run: echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.badlands
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/badlands-rp/azuracast:delegated
+            ghcr.io/badlands-rp/azuracast:${{ github.sha }}
+          build-args: |
+            FORK_REVISION=${{ github.sha }}
+            FORK_COMMIT_DATE=${{ steps.commit.outputs.date }}
+            FORK_BRANCH=${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/Badlands-RP/AzuraCast
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

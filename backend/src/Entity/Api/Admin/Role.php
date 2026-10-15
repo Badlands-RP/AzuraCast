@@ -37,13 +37,25 @@ final class Role
     )]
     public bool $is_super_admin;
 
+    #[OA\Property(type: 'array', items: new OA\Items(type: 'integer'))]
+    public array $assignable_roles = [];
+
+    #[OA\Property]
+    public bool $is_protected = false;
+
 
     public static function fromRole(RoleEntity $role): self
     {
-        return new self(
+        $result = new self(
             $role->id,
             $role->name,
             RolePermissions::fromRolePermissions($role->permissions)
         );
+        $result->assignable_roles = array_values(array_map(
+            static fn(RoleEntity $assignableRole) => $assignableRole->id,
+            $role->assignable_roles->toArray()
+        ));
+        $result->is_protected = $role->is_protected;
+        return $result;
     }
 }

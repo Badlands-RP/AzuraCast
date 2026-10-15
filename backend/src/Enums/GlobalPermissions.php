@@ -18,6 +18,10 @@ enum GlobalPermissions: string implements PermissionInterface
     case CustomFields = 'administer custom fields';
     case Backups = 'administer backups';
     case StorageLocations = 'administer storage locations';
+    case CreateUsers = 'create users';
+    case ManageUsers = 'manage users';
+    case AssignRoles = 'assign roles';
+    case ManageRoles = 'manage roles';
 
     public function getName(): string
     {
@@ -31,6 +35,10 @@ enum GlobalPermissions: string implements PermissionInterface
             self::CustomFields => __('Administer Custom Fields'),
             self::Backups => __('Administer Backups'),
             self::StorageLocations => __('Administer Storage Locations'),
+            self::CreateUsers => __('Create Users'),
+            self::ManageUsers => __('Manage Users'),
+            self::AssignRoles => __('Assign Roles'),
+            self::ManageRoles => __('Manage Roles'),
         };
     }
 

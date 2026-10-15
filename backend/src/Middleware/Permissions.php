@@ -18,7 +18,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 final class Permissions extends AbstractMiddleware
 {
     public function __construct(
-        private readonly string|PermissionInterface $action,
+        private readonly array|string|PermissionInterface $action,
         private readonly bool $useStation = false
     ) {
     }

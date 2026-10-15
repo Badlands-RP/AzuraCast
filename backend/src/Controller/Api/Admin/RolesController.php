@@ -9,16 +9,22 @@ use App\Controller\Api\AbstractApiCrudController;
 use App\Controller\Api\Traits\CanSearchResults;
 use App\Controller\Api\Traits\CanSortResults;
 use App\Entity\Api\Admin\Role as ApiRole;
+use App\Entity\Api\Error;
+use App\Entity\Api\Status;
 use App\Entity\Repository\RolePermissionRepository;
 use App\Entity\Role;
 use App\Entity\RolePermission;
 use App\Entity\Station;
+use App\Enums\GlobalPermissions;
 use App\Http\Response;
 use App\Http\ServerRequest;
 use App\OpenApi;
+use App\Paginator;
+use App\Security\UserAdministration;
 use OpenApi\Attributes as OA;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
+use Slim\Exception\HttpBadRequestException;
 use Symfony\Component\Serializer\Serializer;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -146,6 +152,7 @@ final class RolesController extends AbstractApiCrudController
         ValidatorInterface $validator,
         RolePermissionRepository $permissionRepo,
         private readonly Acl $acl,
+        private readonly UserAdministration $administration,
     ) {
         parent::__construct($serializer, $validator);
 
@@ -157,6 +164,7 @@ final class RolesController extends AbstractApiCrudController
         Response $response,
         array $params
     ): ResponseInterface {
+        $this->administration->requirePermission($request, GlobalPermissions::ManageRoles);
         $qb = $this->em->createQueryBuilder()
             ->select('r, rp')
             ->from(Role::class, 'r')
@@ -179,7 +187,45 @@ final class RolesController extends AbstractApiCrudController
             ]
         );
 
-        return $this->listPaginatedFromQuery($request, $response, $qb->getQuery());
+        if ($this->administration->isSuperAdmin($request->getUser())) {
+            return $this->listPaginatedFromQuery($request, $response, $qb->getQuery());
+        }
+        $rows = array_values(array_filter(
+            $qb->getQuery()->getResult(),
+            fn(Role $role) => $this->administration->canAdministerRole($request->getUser(), $role)
+        ));
+        $paginator = Paginator::fromArray($rows, $request);
+        $paginator->setPostprocessor(fn(Role $role) => $this->viewRecord($role, $request));
+        return $paginator->write($response);
+    }
+
+    protected function createRecord(ServerRequest $request, array $data): object
+    {
+        $this->administration->requirePermission($request, GlobalPermissions::ManageRoles);
+        return parent::createRecord($request, $this->authorizeData($request, $data));
+    }
+
+    protected function getRecord(ServerRequest $request, array $params): ?object
+    {
+        $this->administration->requirePermission($request, GlobalPermissions::ManageRoles);
+        $record = parent::getRecord($request, $params);
+        if ($record instanceof Role) {
+            $this->administration->require(
+                $request,
+                $this->administration->canAdministerRole($request->getUser(), $record)
+            );
+        }
+        return $record;
+    }
+
+    public function editAction(ServerRequest $request, Response $response, array $params): ResponseInterface
+    {
+        $record = $this->getRecord($request, $params);
+        if (null === $record) {
+            return $response->withStatus(404)->withJson(Error::notFound());
+        }
+        $this->editRecord($this->authorizeData($request, (array)$request->getParsedBody()), $record);
+        return $response->withJson(Status::updated());
     }
 
     protected function viewRecord(object $record, ServerRequest $request): ApiRole
@@ -209,7 +255,9 @@ final class RolesController extends AbstractApiCrudController
             throw new RuntimeException('Cannot modify the Super Administrator role.');
         }
 
-        return parent::editRecord($data, $record, $context);
+        $result = $this->em->wrapInTransaction(fn() => parent::editRecord($data, $record, $context));
+        $this->acl->reload();
+        return $result;
     }
 
     protected function deleteRecord(object $record): void
@@ -219,10 +267,13 @@ final class RolesController extends AbstractApiCrudController
         }
 
         parent::deleteRecord($record);
+        $this->acl->reload();
     }
 
     protected function fromArray(array $data, $record = null, array $context = []): object
     {
+        $assignableRoles = $data['assignable_roles'] ?? null;
+        unset($data['assignable_roles']);
         $permissions = null;
         if (isset($data['permissions'])) {
             $permissions = (array)$data['permissions'];
@@ -231,11 +282,95 @@ final class RolesController extends AbstractApiCrudController
 
         $record = parent::fromArray($data, $record, $context);
 
+        if (null !== $assignableRoles) {
+            $record->assignable_roles->clear();
+            foreach ($assignableRoles as $role) {
+                $record->assignable_roles->add($role);
+            }
+        }
+
         if (null !== $permissions) {
             $this->doUpdatePermissions($record, $permissions);
         }
 
         return $record;
+    }
+
+    private function authorizeData(ServerRequest $request, array $data): array
+    {
+        $actor = $request->getUser();
+        $isSuperAdmin = $this->administration->isSuperAdmin($actor);
+        $allowedFields = $isSuperAdmin
+            ? ['name', 'permissions', 'assignable_roles', 'is_protected']
+            : ['name', 'permissions'];
+        $this->administration->require($request, [] === array_diff(array_keys($data), $allowedFields));
+
+        if (array_key_exists('assignable_roles', $data)) {
+            if (!is_array($data['assignable_roles']) || !array_is_list($data['assignable_roles'])) {
+                throw new HttpBadRequestException($request, 'Assignable roles must be a list of role IDs.');
+            }
+            $roles = [];
+            foreach ($data['assignable_roles'] as $id) {
+                if ((!is_int($id) && !is_string($id)) || !ctype_digit((string)$id) || (int)$id < 1) {
+                    throw new HttpBadRequestException($request, 'Assignable roles must contain only role IDs.');
+                }
+                $role = $this->em->find(Role::class, (int)$id);
+                if (!$role instanceof Role || !$this->administration->isOrdinaryRole($role)) {
+                    throw new HttpBadRequestException($request, 'Only ordinary, unprotected roles can be delegated.');
+                }
+                $roles[$role->id] = $role;
+            }
+            $data['assignable_roles'] = array_values($roles);
+        }
+
+        if (array_key_exists('permissions', $data)) {
+            if (!is_array($data['permissions'])) {
+                throw new HttpBadRequestException($request, 'Permissions must be an object.');
+            }
+            $input = $data['permissions'];
+            if (array_diff(array_keys($input), ['global', 'station']) !== []) {
+                throw new HttpBadRequestException($request, 'Unknown permission scope.');
+            }
+            $global = $input['global'] ?? [];
+            $stations = $input['station'] ?? [];
+            if (!is_array($global) || !array_is_list($global) || !is_array($stations)) {
+                throw new HttpBadRequestException($request, 'Invalid permissions.');
+            }
+            foreach ($global as $permission) {
+                $this->administration->require(
+                    $request,
+                    is_string($permission) && $this->administration->canGrantPermission($actor, $permission)
+                );
+            }
+            $normalizedStations = [];
+            foreach ($stations as $id => $permissions) {
+                if (!is_array($permissions)) {
+                    throw new HttpBadRequestException($request, 'Invalid station permissions.');
+                }
+                if (isset($permissions['id'])) {
+                    $id = $permissions['id'];
+                    $permissions = $permissions['permissions'] ?? [];
+                }
+                if (
+                    (!is_int($id) && !is_string($id)) || !ctype_digit((string)$id) || (int)$id < 1
+                    || !is_array($permissions) || !array_is_list($permissions)
+                    || !$this->em->find(Station::class, (int)$id) instanceof Station
+                ) {
+                    throw new HttpBadRequestException($request, 'Invalid station permissions.');
+                }
+                foreach ($permissions as $permission) {
+                    $this->administration->require(
+                        $request,
+                        is_string($permission)
+                            && $this->administration->canGrantPermission($actor, $permission, (int)$id)
+                    );
+                }
+                $normalizedStations[(int)$id] = $permissions;
+            }
+            $data['permissions'] = ['global' => $global, 'station' => $normalizedStations];
+        }
+
+        return $data;
     }
 
     private function doUpdatePermissions(Role $role, array $newPermissions): void
@@ -254,6 +389,7 @@ final class RolesController extends AbstractApiCrudController
                 if ($this->acl->isValidPermission($permName, true)) {
                     $permRecord = new RolePermission($role, null, $permName);
                     $this->em->persist($permRecord);
+                    $existingPerms->add($permRecord);
                 }
             }
         }
@@ -273,6 +409,7 @@ final class RolesController extends AbstractApiCrudController
                         if ($this->acl->isValidPermission($permName, false)) {
                             $permRecord = new RolePermission($role, $station, $permName);
                             $this->em->persist($permRecord);
+                            $existingPerms->add($permRecord);
                         }
                     }
                 }

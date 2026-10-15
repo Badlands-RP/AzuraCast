@@ -87,7 +87,12 @@ export function useAdminMenu() {
                     url: {
                         name: "admin:users:index",
                     },
-                    visible: () => userAllowed(GlobalPermissions.All),
+                    visible: () =>
+                        [
+                            GlobalPermissions.CreateUsers,
+                            GlobalPermissions.ManageUsers,
+                            GlobalPermissions.AssignRoles,
+                        ].some(userAllowed),
                 },
                 {
                     key: "permissions",
@@ -95,7 +100,7 @@ export function useAdminMenu() {
                     url: {
                         name: "admin:permissions:index",
                     },
-                    visible: () => userAllowed(GlobalPermissions.All),
+                    visible: () => userAllowed(GlobalPermissions.ManageRoles),
                 },
                 {
                     key: "auditlog",
