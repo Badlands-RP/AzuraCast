@@ -12,6 +12,7 @@ use App\Controller\Api\Admin\Vue\UsersAction;
 use App\Controller\Api\Frontend\Account\GetMeAction;
 use App\Controller\Api\Frontend\Account\PutMeAction;
 use App\Doctrine\DecoratedEntityManager;
+use App\Doctrine\ReloadableEntityManagerInterface;
 use App\Entity\Repository\RolePermissionRepository;
 use App\Entity\Repository\RoleRepository;
 use App\Entity\Repository\SettingsRepository;
@@ -34,7 +35,10 @@ use Azura\Normalizer\DoctrineEntityNormalizer;
 use DI\Container;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\ORMSetup;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\Tools\SchemaTool;
 use Mezzio\Session\Session;
 use PHPUnit\Framework\TestCase;
@@ -123,14 +127,29 @@ final class DelegatedUserAdministrationTest extends TestCase
         $roles->setEntityManager($this->em);
         $roleRepo = new RoleRepository();
         $roleRepo->setEntityManager($this->em);
-        // @phpstan-ignore method.unresolvableReturnType (tests/_bootstrap.php removes final from repositories.)
-        $stationRepo = $this->createStub(StationRepository::class);
-        $stationRepo->method('fetchSelect')->willReturn([1 => 'Radio station', 2 => 'Other station']);
+        // Stub unrelated station/settings reads at the ORM boundary; keep the final repositories intact.
+        $stationQuery = $this->createStub(Query::class);
+        $stationQuery->method('getArrayResult')->willReturn([
+            ['id' => 1, 'name' => 'Radio station'],
+            ['id' => 2, 'name' => 'Other station'],
+        ]);
+        $stationQueryBuilder = $this->createStub(QueryBuilder::class);
+        $stationQueryBuilder->method('select')->willReturnSelf();
+        $stationQueryBuilder->method('from')->willReturnSelf();
+        $stationQueryBuilder->method('getQuery')->willReturn($stationQuery);
         $settings = new Settings();
+        $settings->app_unique_identifier = '00000000-0000-0000-0000-000000000001';
         $settings->avatar_service = Avatar::SERVICE_DISABLED;
-        // @phpstan-ignore method.unresolvableReturnType (tests/_bootstrap.php removes final from repositories.)
-        $settingsRepo = $this->createStub(SettingsRepository::class);
-        $settingsRepo->method('readSettings')->willReturn($settings);
+        $settingsEntityRepo = $this->createStub(EntityRepository::class);
+        $settingsEntityRepo->method('find')->willReturn($settings);
+        $settingsEntityRepo->method('findOneBy')->willReturn($settings);
+        $metadataEm = $this->createStub(ReloadableEntityManagerInterface::class);
+        $metadataEm->method('getRepository')->willReturn($settingsEntityRepo);
+        $metadataEm->method('createQueryBuilder')->willReturn($stationQueryBuilder);
+        $stationRepo = new StationRepository();
+        $stationRepo->setEntityManager($metadataEm);
+        $settingsRepo = new SettingsRepository($serializer, $validator);
+        $settingsRepo->setEntityManager($metadataEm);
         $avatar = new Avatar();
         $avatar->setSettingsRepo($settingsRepo);
         $getMe = new GetMeAction($avatar, $serializer, $validator, $this->policy);

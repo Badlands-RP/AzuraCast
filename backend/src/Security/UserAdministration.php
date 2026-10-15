@@ -44,7 +44,7 @@ final readonly class UserAdministration
 
         foreach ($role->permissions as $permission) {
             if (
-                $permission->station_id === null
+                $permission->station === null
                 && !$this->isDelegableGlobalPermission($permission->action_name)
             ) {
                 return false;
@@ -89,9 +89,10 @@ final readonly class UserAdministration
         }
 
         foreach ($role->permissions as $permission) {
+            $stationId = $permission->station?->id;
             if (
-                !$this->acl->isValidPermission($permission->action_name, $permission->station_id === null)
-                || !$this->acl->userAllowed($permission->action_name, $actor, $permission->station_id)
+                !$this->acl->isValidPermission($permission->action_name, $stationId === null)
+                || !$this->acl->userAllowed($permission->action_name, $actor, $stationId)
             ) {
                 return false;
             }
