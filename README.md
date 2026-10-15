@@ -24,6 +24,39 @@ You can learn more about AzuraCast via our [Documentation](https://www.azuracast
 
 AzuraCast is built and maintained by passionate human beings, and 100% of our code is reviewed and approved by humans. We do not allow AI to replace our role as software designers or developers, nor do we permit "vibe-coded" contributions. See [our policy on generative AI](https://github.com/AzuraCast/.github/blob/main/CONTRIBUTING.md#our-policy-on-generative-ai) for more details.
 
+## Badlands fork deployment
+
+The `feature/delegated-user-management` branch builds `ghcr.io/badlands-rp/azuracast:delegated`
+through the **Build Badlands AzuraCast** GitHub Actions workflow. The first published package must be public
+in GitHub Packages for your server and web updater to pull it without registry credentials.
+
+Before switching an existing installation, download a full backup from AzuraCast. In Termius, open the server
+and change to its AzuraCast installation directory (normally `/var/azuracast`). Add this setting to the existing
+`docker-compose.override.yml`, or create that file if it does not exist:
+
+```yaml
+services:
+  web:
+    image: ghcr.io/badlands-rp/azuracast:delegated
+```
+
+Preserve any existing overrides. Then run `docker compose pull web` followed by `docker compose up -d web`.
+The container applies the database migration on startup. This restarts the radio container. Subsequent web
+updates pull the fork image configured above; update availability notices still describe upstream releases.
+Keep this override when updating the standard Compose configuration.
+
+As a super administrator, edit the Radio Admin role, grant the required Create Users, Manage Users, Assign Roles,
+and Manage Roles permissions, and select the ordinary roles it may delegate. The acting administrator must also
+have every permission in those roles, including the corresponding station access. Existing roles delegate nothing
+until configured. Newly created roles require super-admin approval before delegates can assign them.
+User administrators, API key administrators, protected accounts, and the acting user's own roles cannot be altered
+through delegated administration. Password resets use the existing user editor; account deletion uses the existing
+Delete action. This version of AzuraCast has no account deactivation field.
+
+Run the security checks with `vendor/bin/phpunit --bootstrap tests/_bootstrap.php tests/Unit/DelegatedUserAdministrationTest.php`.
+The image reuses the upstream runtime pinned in `Dockerfile.badlands`; update that digest together with the fork's
+upstream source when upgrading PHP, radio services, or dependencies.
+
 ## Live Demo
 
 Want to see AzuraCast for yourself? Visit our demo site at [demo.azuracast.com](https://demo.azuracast.com/):

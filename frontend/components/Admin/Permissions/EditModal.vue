@@ -12,12 +12,14 @@
             <admin-permissions-global-form
                 v-model:form="form"
                 :global-permissions="globalPermissions"
+                :assignable-roles="assignableRoles"
             />
 
             <admin-permissions-station-form
                 v-model:form="form"
                 :stations="stations"
                 :station-permissions="stationPermissions"
+                :station-permissions-by-station="stationPermissionsByStation"
             />
         </tabs>
     </modal-form>
@@ -41,6 +43,7 @@ import {
     useBaseEditModal,
 } from "~/functions/useBaseEditModal";
 import { useResettableRef } from "~/functions/useResettableRef.ts";
+import { useUserAllowed } from "~/functions/useUserAllowed.ts";
 import { useTranslate } from "~/vendor/gettext";
 import { useAppCollectScope } from "~/vendor/regle.ts";
 
@@ -49,6 +52,8 @@ const props = defineProps<
         stations: Record<number, string>;
         globalPermissions: Record<GlobalPermissions, string>;
         stationPermissions: Record<StationPermissions, string>;
+        assignableRoles: Record<number, string>;
+        stationPermissionsByStation: Record<number, Record<string, string>>;
     }
 >();
 const emit = defineEmits<BaseEditModalEmits>();
@@ -57,6 +62,8 @@ const $modal = useTemplateRef("$modal");
 
 export type PermissionsRecord = {
     name: string;
+    assignable_roles: number[];
+    is_protected: boolean;
     permissions: {
         global: GlobalPermissions[];
         station: ApiAdminRoleStationPermission[];
@@ -66,6 +73,8 @@ export type PermissionsRecord = {
 const { record: form, reset: resetFormRef } =
     useResettableRef<PermissionsRecord>({
         name: "",
+        assignable_roles: [],
+        is_protected: false,
         permissions: {
             global: [],
             station: [],
@@ -73,6 +82,7 @@ const { record: form, reset: resetFormRef } =
     });
 
 const { r$ } = useAppCollectScope("admin-permissions");
+const { userAllowed } = useUserAllowed();
 
 const {
     loading,
@@ -83,7 +93,7 @@ const {
     edit,
     doSubmit,
     close,
-} = useBaseEditModal<PermissionsRecord>(
+} = useBaseEditModal<Partial<PermissionsRecord>>(
     toRef(props, "createUrl"),
     emit,
     $modal,
@@ -92,12 +102,18 @@ const {
         r$.$reset();
     },
     (data) => {
-        form.value = mergeExisting(form.value, data);
+        form.value = mergeExisting<PermissionsRecord>(form.value, data);
         r$.$reset();
     },
     async () => {
         const { valid } = await r$.$validate();
-        return { valid, data: form.value };
+        const data = userAllowed(GlobalPermissions.All)
+            ? form.value
+            : {
+                  name: form.value.name,
+                  permissions: form.value.permissions,
+              };
+        return { valid, data };
     },
 );
 

@@ -37,16 +37,28 @@ final class Role implements Stringable, IdentifiableEntityInterface
     #[ORM\OneToMany(targetEntity: RolePermission::class, mappedBy: 'role')]
     public private(set) Collection $permissions;
 
+    /** @var Collection<int, Role> Roles that members may delegate, subject to their own permissions. */
+    #[ORM\ManyToMany(targetEntity: self::class)]
+    #[ORM\JoinTable(name: 'role_delegation')]
+    #[ORM\JoinColumn(name: 'administrator_role_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'assignable_role_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    public private(set) Collection $assignable_roles;
+
+    #[ORM\Column(options: ['default' => false])]
+    public bool $is_protected = false;
+
     public function __construct()
     {
         $this->users = new ArrayCollection();
         $this->permissions = new ArrayCollection();
+        $this->assignable_roles = new ArrayCollection();
     }
 
     public function __clone(): void
     {
         $this->users = new ArrayCollection();
         $this->permissions = new ArrayCollection();
+        $this->assignable_roles = new ArrayCollection();
     }
 
     public function __toString(): string

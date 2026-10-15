@@ -32,6 +32,8 @@ const { data: props, isLoading: propsLoading } =
             stations: {},
             globalPermissions: {},
             stationPermissions: {},
+            assignableRoles: {},
+            stationPermissionsByStation: {},
         }),
     });
 </script>

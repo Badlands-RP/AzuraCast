@@ -66,6 +66,8 @@
             :station-permissions="props.stationPermissions"
             :stations="props.stations"
             :global-permissions="props.globalPermissions"
+            :assignable-roles="props.assignableRoles"
+            :station-permissions-by-station="props.stationPermissionsByStation"
             @relist="() => relist()"
         />
     </card-page>

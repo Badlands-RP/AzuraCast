@@ -28,7 +28,14 @@ final readonly class PermissionsProps
             type: 'object',
             additionalProperties: new OA\AdditionalProperties(type: 'string')
         )]
-        public array $stationPermissions
+        public array $stationPermissions,
+        #[OA\Property(type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'string'))]
+        public array $assignableRoles = [],
+        #[OA\Property(type: 'object', additionalProperties: new OA\AdditionalProperties(
+            type: 'object',
+            additionalProperties: new OA\AdditionalProperties(type: 'string')
+        ))]
+        public array $stationPermissionsByStation = [],
     ) {
     }
 }

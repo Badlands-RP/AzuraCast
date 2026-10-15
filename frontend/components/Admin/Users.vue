@@ -3,6 +3,7 @@
         <card-page :title="$gettext('Users')">
             <template #actions>
                 <add-button
+                    v-if="canCreateUsers"
                     :text="$gettext('Add User')"
                     @click="doCreate"
                 />
@@ -43,6 +44,7 @@
                         class="btn-group btn-group-sm"
                     >
                         <a
+                            v-if="isSuperAdmin"
                             class="btn btn-secondary"
                             :href="row.item.links.masquerade"
                             target="_blank"
@@ -50,6 +52,7 @@
                             {{ $gettext('Log In') }}
                         </a>
                         <button
+                            v-if="isSuperAdmin"
                             type="button"
                             class="btn btn-secondary"
                             @click="doOpenLoginLink(row.item)"
@@ -57,6 +60,7 @@
                             {{ $gettext('Login Link') }}
                         </button>
                         <button
+                            v-if="canManageUsers || canAssignRoles"
                             type="button"
                             class="btn btn-primary"
                             @click="doEdit(row.item.links.self)"
@@ -64,6 +68,7 @@
                             {{ $gettext('Edit') }}
                         </button>
                         <button
+                            v-if="canManageUsers"
                             type="button"
                             class="btn btn-danger"
                             @click="doDelete(row.item.links.self)"
@@ -103,12 +108,14 @@ import Loading from "~/components/Common/Loading.vue";
 import {
     ApiAdminUserWithDetails,
     ApiAdminVueUsersProps,
+    GlobalPermissions,
 } from "~/entities/ApiInterfaces.ts";
 import { QueryKeys } from "~/entities/Queries.ts";
 import { useApiItemProvider } from "~/functions/dataTable/useApiItemProvider.ts";
 import { useApiRouter } from "~/functions/useApiRouter.ts";
 import useConfirmAndDelete from "~/functions/useConfirmAndDelete";
 import useHasEditModal from "~/functions/useHasEditModal";
+import { useUserAllowed } from "~/functions/useUserAllowed.ts";
 import { useAxios } from "~/vendor/axios.ts";
 import { useTranslate } from "~/vendor/gettext";
 
@@ -132,6 +139,11 @@ const { data: props, isLoading: propsLoading } =
     });
 
 const { $gettext } = useTranslate();
+const { userAllowed } = useUserAllowed();
+const isSuperAdmin = userAllowed(GlobalPermissions.All);
+const canCreateUsers = userAllowed(GlobalPermissions.CreateUsers);
+const canManageUsers = userAllowed(GlobalPermissions.ManageUsers);
+const canAssignRoles = userAllowed(GlobalPermissions.AssignRoles);
 
 type Row = Required<ApiAdminUserWithDetails>;
 

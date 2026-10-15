@@ -6678,6 +6678,12 @@ components:
               description: 'Whether this role is the protected "Super Administrator" role.'
               type: boolean
               readOnly: true
+            assignable_roles:
+              type: array
+              items:
+                type: integer
+            is_protected:
+              type: boolean
           type: object
     Api_Admin_RolePermissions:
       required:
@@ -7060,6 +7066,8 @@ components:
         - stations
         - globalPermissions
         - stationPermissions
+        - assignableRoles
+        - stationPermissionsByStation
       properties:
         stations:
           type: object
@@ -7073,6 +7081,16 @@ components:
           type: object
           additionalProperties:
             type: string
+        assignableRoles:
+          type: object
+          additionalProperties:
+            type: string
+        stationPermissionsByStation:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
       type: object
     Api_Admin_Vue_SettingsProps:
       required:
@@ -10257,6 +10275,9 @@ components:
               type: string
               example: 'Demo Account'
               nullable: true
+            is_protected:
+              description: 'Only super administrators can change protection from delegated administration.'
+              type: boolean
             locale:
               type: string
               example: en_US
@@ -10325,6 +10346,10 @@ components:
         - 'administer custom fields'
         - 'administer backups'
         - 'administer storage locations'
+        - 'create users'
+        - 'manage users'
+        - 'assign roles'
+        - 'manage roles'
       x-enumNames:
         - All
         - View
@@ -10335,6 +10360,10 @@ components:
         - CustomFields
         - Backups
         - StorageLocations
+        - CreateUsers
+        - ManageUsers
+        - AssignRoles
+        - ManageRoles
     ReleaseChannel:
       type: string
       enum:

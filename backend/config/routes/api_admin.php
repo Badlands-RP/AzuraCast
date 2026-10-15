@@ -271,9 +271,12 @@ return static function (RouteCollectorProxy $group) {
                     Controller\Api\Admin\CustomFieldsController::class,
                     GlobalPermissions::CustomFields,
                 ],
-                ['role', 'roles', Controller\Api\Admin\RolesController::class, GlobalPermissions::All],
+                ['role', 'roles', Controller\Api\Admin\RolesController::class, GlobalPermissions::ManageRoles],
                 ['station', 'stations', Controller\Api\Admin\StationsController::class, GlobalPermissions::Stations],
-                ['user', 'users', Controller\Api\Admin\UsersController::class, GlobalPermissions::All],
+                [
+                    'user', 'users', Controller\Api\Admin\UsersController::class,
+                    [GlobalPermissions::CreateUsers, GlobalPermissions::ManageUsers, GlobalPermissions::AssignRoles],
+                ],
                 [
                     'login_token',
                     'login_tokens',

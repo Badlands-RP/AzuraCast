@@ -11,6 +11,7 @@ use App\Entity\Interfaces\EntityGroupsInterface;
 use App\Http\Response;
 use App\Http\ServerRequest;
 use App\OpenApi;
+use App\Security\UserAdministration;
 use App\Service\Avatar;
 use OpenApi\Attributes as OA;
 use Psr\Http\Message\ResponseInterface;
@@ -41,8 +42,9 @@ final class GetMeAction extends UsersController implements SingleActionInterface
         private readonly Avatar $avatar,
         Serializer $serializer,
         ValidatorInterface $validator,
+        UserAdministration $administration,
     ) {
-        parent::__construct($serializer, $validator);
+        parent::__construct($serializer, $validator, $administration);
     }
 
     public function __invoke(
